@@ -201,7 +201,7 @@ class BundledResults:
     def __init__(self, path):
         with gzip.open(path, "rt", encoding="utf-8") as stream:
             snapshot = json.load(stream)
-        if snapshot["schema_version"] != 1:
+        if snapshot["schema_version"] not in (1, 2):
             raise ValueError("Unsupported bundled snapshot version")
         self.responses = snapshot["responses"]
         self.recommendation_rows = snapshot["recommendations"]
@@ -226,6 +226,7 @@ class BundledResults:
 
 def create_app(config=None):
     app = Flask(__name__)
+    app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 0
     app.config.from_mapping(
         WEBHDFS=os.environ.get("MOVIELENS_WEBHDFS"),
         HDFS_USER=os.environ.get("MOVIELENS_HDFS_USER", "hadoop"),
@@ -260,6 +261,96 @@ def create_app(config=None):
     @app.get("/")
     def index():
         return render_template("index.html", data_mode=mode)
+
+    similar_cache = None
+    similar_lock = Lock()
+
+    @app.get("/api/movie/similar")
+    def similar_movies():
+        nonlocal similar_cache
+        value = request.args.get("movie_id", "260")
+        if not value.isascii() or not value.isdecimal() or len(value) > 10 or int(value) <= 0:
+            return jsonify(error="请输入有效的电影编号"), 400
+        with similar_lock:
+            if similar_cache is None:
+                if mode == "cluster":
+                    rows = hdfs.parquet_rows("/movie/result/rdd/movie_similarity")
+                else:
+                    with gzip.open(app.config["SNAPSHOT_FILE"], "rt", encoding="utf-8") as source:
+                        rows = json.load(source).get("similar_movies")
+                    if rows is None:
+                        return jsonify(error="当前快照尚未导出相似电影，请使用集群模式"), 503
+                grouped = defaultdict(list)
+                for row in rows:
+                    grouped[int(row["movie_id"])].append(row)
+                similar_cache = grouped
+        rows = sorted(similar_cache.get(int(value), []), key=lambda row: row["rank"])
+        return jsonify(movie_id=int(value), movies=rows)
+
+    profile_cache = {}
+    profile_lock = Lock()
+
+    def profile_rows(name):
+        with profile_lock:
+            if name not in profile_cache:
+                if mode == "cluster":
+                    rows = hdfs.parquet_rows("/movie/result/sql/" + name)
+                else:
+                    with gzip.open(app.config["SNAPSHOT_FILE"], "rt", encoding="utf-8") as source:
+                        rows = json.load(source).get("sql_profiles", {}).get(name)
+                    if rows is None:
+                        raise ValueError("当前快照尚未导出用户画像")
+                profile_cache[name] = rows
+            return profile_cache[name]
+
+    @app.get("/api/profile/age-genre")
+    def age_genre():
+        return jsonify(rows=profile_rows("age_genre_pivot"))
+
+    @app.get("/api/profile/gender")
+    def gender_profile():
+        return jsonify(rows=[r for r in profile_rows("user_profile_cube") if r["grouping_id"] == 2])
+
+    @app.get("/api/genre/top10")
+    def genre_top10():
+        rows = profile_rows("genre_top10")
+        genres = sorted({r["genre"] for r in rows})
+        genre = request.args.get("genre", "Sci-Fi")
+        if genre not in genres:
+            return jsonify(error="未知电影类型"), 400
+        return jsonify(genres=genres, genre=genre, movies=sorted(
+            [r for r in rows if r["genre"] == genre], key=lambda r: r["rank"]))
+
+    @app.get("/api/profile/daily")
+    def profile_daily():
+        rows = sorted(profile_rows("daily_moving_avg"), key=lambda r: str(r["rating_date"]))
+        return jsonify(rows=[dict(r, rating_date=str(r["rating_date"])) for r in rows])
+
+    graph_cache = None
+    graph_lock = Lock()
+
+    @app.get("/api/graph")
+    def movie_graph():
+        nonlocal graph_cache
+        with graph_lock:
+            if graph_cache is None:
+                if mode == "cluster":
+                    root = "/movie/result/graph_v3"
+                    ranks = hdfs.parquet_rows(root + "/pagerank")
+                    graph_cache = {
+                        "nodes": hdfs.json_snapshot(root + "/edges_top/nodes"),
+                        "edges": hdfs.json_snapshot(root + "/edges_top/edges"),
+                        "metrics": hdfs.json_snapshot(root + "/metrics")[0],
+                        "communities": hdfs.json_snapshot(root + "/community_summary"),
+                        "ranking": sorted(ranks, key=lambda r: (-r["pagerank"], r["movie_id"]))[:20],
+                        "popular": dashboard.offline()["ranking"],
+                    }
+                else:
+                    with gzip.open(app.config["SNAPSHOT_FILE"], "rt", encoding="utf-8") as source:
+                        graph_cache = json.load(source).get("graph")
+                    if graph_cache is None:
+                        raise ValueError("当前快照尚未导出关系图，请使用集群模式")
+        return jsonify(graph_cache)
 
     @app.get("/api/overview")
     def overview():

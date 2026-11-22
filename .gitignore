@@ -36,3 +36,8 @@ users.dat
 /pipeline/streaming/kafka-data/
 /pipeline/streaming/kafka-stage5.properties
 /pipeline/streaming/classes/
+
+/runtime/
+/wheels/
+/start.cmd
+/部署说明.txt

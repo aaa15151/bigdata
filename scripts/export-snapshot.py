@@ -1,4 +1,5 @@
 import argparse
+from decimal import Decimal
 import gzip
 import json
 import sys
@@ -6,7 +7,7 @@ from pathlib import Path
 
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "dashboard"))
-from app import SNAPSHOT_FILE, create_app
+from app import SNAPSHOT_FILE, create_app, WebHDFS
 
 
 ROUTES = (
@@ -16,7 +17,8 @@ ROUTES = (
 
 
 def export(output):
-    client = create_app({"DATA_MODE": "cluster"}).test_client()
+    app = create_app({"DATA_MODE": "cluster"})
+    client = app.test_client()
 
     def get(route):
         response = client.get(route)
@@ -35,10 +37,20 @@ def export(output):
     if user_count != 6040 or any(len(rows) != 10 for rows in recommendations.values()):
         raise ValueError("Export requires all 6,040 MovieLens 1M users with ten recommendations each")
 
-    snapshot = {"schema_version": 1, "responses": responses, "recommendations": recommendations}
+    addresses = app.config["DATANODES"]
+    if isinstance(addresses, str):
+        addresses = json.loads(addresses)
+    hdfs = WebHDFS(app.config["WEBHDFS"], app.config["HDFS_USER"], addresses)
+    profiles = {name: hdfs.parquet_rows("/movie/result/sql/" + name) for name in
+                ("age_genre_pivot", "user_profile_cube", "genre_top10", "daily_moving_avg", "occupation_profile")}
+    for row in profiles["daily_moving_avg"]:
+        row["rating_date"] = str(row["rating_date"])
+    snapshot = {"schema_version": 2, "responses": responses, "recommendations": recommendations,
+                "similar_movies": hdfs.parquet_rows("/movie/result/rdd/movie_similarity"),
+                "sql_profiles": profiles, "graph": get("/api/graph") }
     output.parent.mkdir(parents=True, exist_ok=True)
     temporary = output.with_suffix(".tmp")
-    temporary.write_bytes(gzip.compress(json.dumps(snapshot, ensure_ascii=False, separators=(",", ":"))
+    temporary.write_bytes(gzip.compress(json.dumps(snapshot, ensure_ascii=False, separators=(",", ":"), default=lambda value: float(value) if isinstance(value, Decimal) else str(value))
                                         .encode("utf-8"), mtime=0))
     temporary.replace(output)
     print(f"Saved {user_count:,} users and {sum(map(len, recommendations.values())):,} ALS rows to {output}")

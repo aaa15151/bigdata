@@ -95,3 +95,20 @@ flowchart LR
 从 [GroupLens MovieLens 1M](https://grouplens.org/datasets/movielens/1m/) 获取原始数据，遵守 [数据使用许可](https://files.grouplens.org/datasets/movielens/ml-1m-README.txt)。仓库提供代码、截图和从本项目 HDFS 导出的展示结果，包括聚合统计、ALS 推荐和最后一次回放快照。原始评分、用户资料、清洗明细和 Kafka 消息由复现者通过官方数据和流水线生成。快照内容和导出方式见 [结果快照](dashboard/snapshots/README.md)。
 
 此课程项目的技术路线参考 [Distributed Spark Movie Recommender](https://github.com/zubiiabbasi/distributed-spark-movielens-recommender)。随项目分发的 Apache ECharts 保留原 [LICENSE](dashboard/static/echarts-LICENSE.txt) 和 [NOTICE](dashboard/static/echarts-NOTICE.txt)。
+
+
+## 新增课程演示模块
+
+顶部标签页分别展示离线分析、ALS 推荐、实时回放、M1 相似电影、M2 用户画像及 M4 电影关系网。
+
+- M1：RDD 累加器、广播、分区、缓存与余弦相似度，生成 23,900 条相似推荐。
+- M2：Spark 通过 Hive Metastore 读取表，生成年月分区数据、CUBE、PIVOT、类型 Top10 和 7 日移动平均。整体评分总计为 1,000,209；多类型评分单独计数。
+- M4：GraphX PageRank、标签传播、连通分量及邻居统计。采用共同喜欢人数至少 30、余弦相似度至少 0.15、任一方 Top10 邻居保留规则，结果为 1,400 个电影节点、9,632 对关系、31 个社区、1 个连通分量。前端展示 100 个节点。
+
+运行入口：`pipeline/rdd/run-m1.sh`、`pipeline/sql/run-m2.sh`、`pipeline/graph/run-m4.sh`。M2 需要 `thrift://namenode:9083` Metastore；M4 读取 M1 结果，默认输出 `/movie/result/graph_v3`。所有作业拒绝覆盖已存在的正式输出。
+
+新增接口：`/api/movie/similar?movie_id=260`、`/api/profile/age-genre`、`/api/profile/gender`、`/api/genre/top10?genre=Sci-Fi`、`/api/profile/daily`、`/api/graph`。
+
+仓库快照已包含全部新增模块，按原快速启动方式即可离线演示。`scripts/export-snapshot.py` 从集群导出完整快照。
+
+页面将历史事件时间映射至 2024 年 1 月至 2026 年 8 月，仅用于演示，并省略电影上映年份。时间轴经过压缩，日历显示日期和窗口时间为演示标签；原始数据、API 及统计口径保持不变，不能将展示时间作为真实采集日期。

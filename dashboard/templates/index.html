@@ -8,15 +8,15 @@
   <title>MovieLens · 评分分析与推荐</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}">
   <script defer src="{{ url_for('static', filename='echarts.min.js') }}"></script>
+  <script defer src="{{ url_for('static', filename='presentation.js') }}"></script>
   <script defer src="{{ url_for('static', filename='dashboard.js') }}"></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='modules.css') }}">
+  <script defer src="{{ url_for('static', filename='modules.js') }}"></script>
 </head>
 <body data-mode="{{ data_mode }}">
   <header class="topbar">
     <div class="wrap topbar-inner">
       <a class="brand" href="#top" aria-label="MovieLens 首页"><span class="brand-icon" aria-hidden="true"><i></i><i></i><i></i></span>MovieLens<span class="brand-divider"></span><span class="brand-product">分析看板</span></a>
-      <nav class="nav" aria-label="看板导航">
-        <a href="#offline">离线分析</a><a href="#realtime">评分回放</a><a href="#recommendations">电影推荐</a>
-      </nav>
       <span class="connection" id="connection" data-state="waiting" role="status"><span class="dot"></span><span id="connection-text">连接中</span></span>
     </div>
   </header>
@@ -27,13 +27,22 @@
       <p class="date-range" id="date-range"></p>
     </div>
 
+    <p class="small-note">演示时间：原始事件时间映射至 2024 年 1 月至 2026 年 8 月，时间轴经过压缩；非近期真实评分。片名省略上映年份。</p>
     <dl class="totals" aria-label="数据集概览">
       <div><dt>评分记录</dt><dd id="total-ratings">—</dd></div>
       <div><dt>入库影片</dt><dd id="total-movies">—</dd></div>
       <div><dt>评分用户</dt><dd id="total-users">—</dd></div>
     </dl>
 
-    <section id="offline" aria-labelledby="offline-heading">
+<nav class="module-tabs" role="tablist" aria-label="演示模块">
+<button type="button" role="tab" id="tab-offline" aria-controls="offline" aria-selected="true" tabindex="0" data-module="offline">离线分析</button>
+<button type="button" role="tab" id="tab-recommendations" aria-controls="recommendations" aria-selected="false" tabindex="-1" data-module="recommendations">ALS 推荐</button>
+<button type="button" role="tab" id="tab-realtime" aria-controls="realtime" aria-selected="false" tabindex="-1" data-module="realtime">实时回放</button>
+<button type="button" role="tab" id="tab-similar" aria-controls="similar" aria-selected="false" tabindex="-1" data-module="similar">M1 相似电影</button>
+<button type="button" role="tab" id="tab-profile" aria-controls="profile" aria-selected="false" tabindex="-1" data-module="profile">M2 用户画像</button>
+<button type="button" role="tab" id="tab-graph" aria-controls="graph" aria-selected="false" tabindex="-1" data-module="graph">M4 电影关系网</button>
+</nav>
+    <section id="offline" role="tabpanel" aria-labelledby="tab-offline" tabindex="0">
       <div class="section-head"><h2 id="offline-heading">离线分析</h2><p id="offline-status" role="status">读取离线快照…</p></div>
       <div class="pair offline-grid">
         <article class="panel">
@@ -92,7 +101,7 @@
       </div>
     </section>
 
-    <section id="realtime" aria-labelledby="realtime-heading">
+    <section id="realtime" role="tabpanel" aria-labelledby="tab-realtime" tabindex="0" hidden>
       <div class="section-head"><h2 id="realtime-heading">实时评分回放</h2><p id="realtime-status" role="status">历史事件时间 · 每 5 秒刷新</p></div>
       <div class="pair realtime-grid">
         <article class="panel">
@@ -120,7 +129,7 @@
       </div>
     </section>
 
-    <section id="recommendations" aria-labelledby="recommendations-heading">
+    <section id="recommendations" role="tabpanel" aria-labelledby="tab-recommendations" tabindex="0" hidden>
       <div class="section-head"><h2 id="recommendations-heading">电影推荐</h2></div>
       <div class="pair recommendation-grid">
         <article class="panel recommendations-panel">
@@ -142,6 +151,46 @@
         </article>
       </div>
     </section>
+    <section id="similar" role="tabpanel" aria-labelledby="tab-similar" tabindex="0" hidden>
+      <div class="section-head"><h2 id="similar-heading">相似电影 · RDD</h2></div>
+      <article class="panel">
+        <form id="similar-form" class="user-form">
+          <label for="similar-id">电影编号</label>
+          <input id="similar-id" value="260" inputmode="numeric" pattern="[0-9]+" maxlength="10" required>
+          <button type="submit">查询相似电影</button>
+        </form>
+        <p class="small-note">基于共同喜欢的观众计算；每位用户最多取最近喜欢的 200 部电影。示例：260（Star Wars）。</p>
+        <p id="similar-status" role="status"></p>
+        <table class="movie-table"><thead><tr><th>排名</th><th>影片</th><th>共同喜欢人数</th><th>相似度</th></tr></thead><tbody id="similar-rows"></tbody></table>
+      </article>
+    </section>
+    <script src="{{ url_for('static', filename='similar.js') }}" defer></script>
+    <section id="profile" role="tabpanel" aria-labelledby="tab-profile" tabindex="0" hidden>
+      <div class="section-head"><h2 id="profile-heading">用户画像 · Spark SQL</h2></div>
+      <p class="small-note">电影可属于多个类型，类型评分次数会重复归属。性别偏好按各性别的类型评分次数占比比较。</p>
+      <div class="pair">
+        <article class="panel"><h3>年龄 × 类型评分次数</h3><p id="age-status" role="status"></p><div id="age-chart" style="height:420px"></div></article>
+        <article class="panel"><h3>性别类型偏好</h3><p id="gender-status" role="status"></p><div id="gender-chart" style="height:420px"></div></article>
+      </div>
+      <article class="panel"><h3>类型 Top10</h3><label for="genre-select">电影类型</label> <select id="genre-select"><option>Sci-Fi</option></select><p id="genre-status" role="status"></p>
+      <table class="movie-table"><thead><tr><th>排名</th><th>电影</th><th>评分次数</th><th>平均分</th></tr></thead><tbody id="genre-rows"></tbody></table></article>
+      <article class="panel"><h3>每日评分量与 7 日移动平均</h3><p class="small-note">无评分日期按 0 补齐；开头不足 7 天时按已有天数计算。</p><p id="daily-status" role="status"></p><div id="daily-profile-chart" style="height:360px"></div></article>
+    </section>
+    <script src="{{ url_for('static', filename='profiles.js') }}" defer></script>
+    <section id="graph" role="tabpanel" aria-labelledby="tab-graph" tabindex="0" hidden>
+      <div class="section-head"><h2 id="graph-heading">电影关系网 · GraphX</h2></div>
+      <article class="panel">
+        <p id="graph-status" role="status">正在加载电影关系网…</p>
+        <p class="small-note">节点大小表示 PageRank，颜色表示标签传播社区。仅展示影响力前 100 部电影及其相互关系；可拖动、缩放，悬停查看影片信息。PageRank 衡量本图中的连接影响力，不代表电影评分。</p>
+        <div id="movie-graph" style="height:560px" role="img" aria-label="电影关系网络图"></div>
+      </article>
+      <div class="pair">
+        <article class="panel"><h3>影响力 Top20</h3><ol id="graph-ranking" class="ranking-list"></ol></article>
+        <article class="panel"><h3>评分次数 Top20</h3><ol id="graph-popular" class="ranking-list"></ol></article>
+      </div>
+      <article class="panel"><h3>最大的 10 个社区</h3><p class="small-note">按电影数排列；主要类型可重复归属。</p><ol id="graph-communities"></ol></article>
+    </section>
+    <script src="{{ url_for('static', filename='graph.js') }}" defer></script>
   </main>
 </body>
 </html>

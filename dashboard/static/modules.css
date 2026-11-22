@@ -1,0 +1,7 @@
+[role="tabpanel"][hidden] { display: none !important; }
+.module-tabs { position: sticky; top: 0; z-index: 30; display: flex; gap: 8px; overflow-x: auto; padding: 12px; margin: 20px 0; background: #f4f7fc; border: 1px solid #dce4f0; border-radius: 12px; box-shadow: 0 4px 12px #1a34550a; }
+.module-tabs button { flex: 0 0 auto; border: 1px solid transparent; border-radius: 8px; padding: 12px 18px; background: transparent; color: #405572; font: inherit; cursor: pointer; }
+.module-tabs button[aria-selected="true"] { background: #245bd6; color: white; }
+.module-tabs button:focus-visible { outline: 3px solid #88aaff; outline-offset: 2px; }
+.module-tabs button:hover:not([aria-selected="true"]) { background: #e4ecfa; }
+[role="tabpanel"] { scroll-margin-top: 90px; }
