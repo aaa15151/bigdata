@@ -7,8 +7,8 @@
 安装 **Git 和 Python 3.11 或更高版本**后，复制以下命令。首次启动会自动创建虚拟环境并安装 Flask。
 
 ```powershell
-git clone https://github.com/AAaawwee/movielens-bigdata-dashboard-1.git
-cd movielens-bigdata-dashboard-1
+git clone https://github.com/aaa15151/bigdata.git
+cd bigdata
 py -3.11 run.py
 ```
 
@@ -112,3 +112,8 @@ flowchart LR
 仓库快照已包含全部新增模块，按原快速启动方式即可离线演示。`scripts/export-snapshot.py` 从集群导出完整快照。
 
 页面将历史事件时间映射至 2024 年 1 月至 2026 年 8 月，仅用于演示，并省略电影上映年份。时间轴经过压缩，日历显示日期和窗口时间为演示标签；原始数据、API 及统计口径保持不变，不能将展示时间作为真实采集日期。
+
+
+## 项目来源
+
+本仓库在 [AAaawwee/movielens-bigdata-dashboard-1](https://github.com/AAaawwee/movielens-bigdata-dashboard-1) 的基础上扩展，保留原提交历史、数据来源说明及第三方许可。新增课程模块与页面演示说明见 [扩展模块指南](docs/extensions.md)。
