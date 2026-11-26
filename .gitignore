@@ -41,3 +41,12 @@ users.dat
 /wheels/
 /start.cmd
 /部署说明.txt
+
+# Local development and live replay artifacts
+/realtime-service/target/
+/pipeline/live/data/
+/pipeline/live/classes/
+/pipeline/live/current-run.txt
+*.before-*
+*.class
+/.m2-live/

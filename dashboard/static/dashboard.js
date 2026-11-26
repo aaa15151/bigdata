@@ -294,9 +294,33 @@ async function loadOffline() {
   }
 }
 
-const shortWindow = value => value.slice(5, 16).replace("T", " ");
+const shortWindow = value => new Intl.DateTimeFormat("zh-CN", {
+  timeZone: "Asia/Shanghai",
+  month: "2-digit", day: "2-digit",
+  hour: "2-digit", minute: "2-digit", second: "2-digit",
+  hourCycle: "h23"
+}).format(new Date(value));
 let realtimeBusy = false;
 let lastWindows;
+
+function replayZoom(chartId, count) {
+  const instance = chart(chartId);
+  const previous = instance.getOption() || {};
+  const oldCount = previous.series?.[0]?.data?.length || 0;
+  const zoom = previous.dataZoom?.[0];
+  const start = Number(zoom?.startValue ?? 0);
+  const end = Number(zoom?.endValue ?? Math.max(0, oldCount - 1));
+  const follow = !zoom || end >= oldCount - 1;
+  const span = zoom ? Math.max(1, end - start) : 29;
+  const nextEnd = follow ? Math.max(0, count - 1) : end;
+  const nextStart = follow ? Math.max(0, nextEnd - span) : start;
+  return [
+    {type:"slider", xAxisIndex:0, bottom:6, height:20,
+     startValue:nextStart, endValue:nextEnd},
+    {type:"inside", xAxisIndex:0,
+     startValue:nextStart, endValue:nextEnd}
+  ];
+}
 
 function drawRealtime(windows) {
   const latest = windows.at(-1);
@@ -305,7 +329,7 @@ function drawRealtime(windows) {
   byId("window-low").textContent = percent.format(latest.low_rating_ratio);
   const config = baseChart();
   const labels = windows.map(row => shortWindow(row.window_start));
-  chart("realtime-chart").setOption({ ...config, grid: { ...config.grid, top: 32 },
+  chart("realtime-chart").setOption({ ...config, dataZoom: replayZoom("realtime-chart", windows.length), grid: { ...config.grid, top: 32, bottom: 75 },
     legend: { top: 6, right: 20, textStyle: { color: textColor }, data: ["评分数", "低分比例"] },
     xAxis: categoryAxis(labels),
     yAxis: [valueAxis(value => compact.format(value)), valueAxis(value => `${value}%`, { max: 100, interval: 25, splitLine: { show: false } })],
@@ -318,7 +342,7 @@ function drawRealtime(windows) {
     ],
   }, true);
   chart("average-chart").setOption({
-    ...config,
+    ...config, dataZoom: replayZoom("average-chart", windows.length), grid: { ...config.grid, bottom: 75 },
     xAxis: categoryAxis(labels),
     yAxis: valueAxis(value => `${value} 分`, { min: 1, max: 5, interval: 1 }),
     series: [{ type: "line", name: "平均分", data: windows.map(row => row.avg_rating),
@@ -331,8 +355,8 @@ function drawRealtime(windows) {
   chart("alert-mix-chart").setOption({
     textStyle: config.textStyle,
     color: ["#6381bd", "#eeb060", "#c86459"],
-    tooltip: { trigger: "item", renderMode: "richText", formatter: "{b}  {c} 个窗口（{d}%）" },
-    title: { text: String(windows.length), subtext: "个窗口", left: "center", top: "30%",
+    tooltip: { trigger: "item", renderMode: "richText", formatter: "{b}  {c} 个批次（{d}%）" },
+    title: { text: String(windows.length), subtext: "个批次", left: "center", top: "30%",
       textStyle: { color: "#18243a", fontFamily: font, fontSize: 25 }, subtextStyle: { color: textColor } },
     legend: { bottom: 14, textStyle: { color: textColor }, selectedMode: false },
     series: [{ type: "pie", radius: ["39%", "63%"], center: ["50%", "42%"],
@@ -341,16 +365,16 @@ function drawRealtime(windows) {
         { name: "高度", value: levels.HIGH }] }],
   }, true);
   const alerts = windows.filter(row => row.alert_level === "HIGH" || row.alert_level === "MEDIUM").reverse();
-  byId("alert-count").textContent = `最近 ${windows.length} 窗口 · ${alerts.length} 条`;
+  byId("alert-count").textContent = `最近 ${windows.length} 批次 · ${alerts.length} 条`;
   const items = alerts.slice(0, 5).map(alert => {
     const high = alert.alert_level === "HIGH";
     const row = document.createElement("li");
     row.append(column(high ? "高度" : "中度", high ? "alert-tone high" : "alert-tone"),
-      column(`${shortWindow(alert.window_start)}–${alert.window_end.slice(11, 16)}`, "alert-time"),
+      column(shortWindow(alert.window_start), "alert-time"),
       column(percent.format(alert.low_rating_ratio), "row-value"));
     return row;
   });
-  byId("alerts").replaceChildren(...(items.length ? items : [column("最近窗口暂无低分告警", "empty", "li")]));
+  byId("alerts").replaceChildren(...(items.length ? items : [column("当前批次暂无低分告警", "empty", "li")]));
 }
 
 function setConnection(state, label, context) {
@@ -420,5 +444,24 @@ loadOffline();
 loadHourly();
 loadMovieScores();
 loadRecommendations(byId("user-id").value);
-refreshRealtime();
-if (!bundledMode) setInterval(refreshRealtime, 5000);
+window.addEventListener("movielens-live-batches", event => {
+  const rows = event.detail;
+  if (!Array.isArray(rows) || rows.length === 0) {
+    byId("realtime-status").textContent = "等待评分批次";
+    return;
+  }
+  const windows = rows.map(row => ({
+    ...row,
+    window_start: row.committed_at,
+    window_end: row.committed_at,
+    alert_level: row.low_rating_ratio >= 0.4 ? "HIGH"
+      : row.low_rating_ratio >= 0.2 ? "MEDIUM" : "NORMAL"
+  }));
+  const key = JSON.stringify(windows);
+  if (key !== lastWindows) {
+    drawRealtime(windows);
+    lastWindows = key;
+  }
+  byId("realtime-status").textContent =
+    `评分实时回放 · 共 ${rows.length} 批 · 北京时间`;
+});

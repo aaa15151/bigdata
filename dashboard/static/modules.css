@@ -5,3 +5,11 @@
 .module-tabs button:focus-visible { outline: 3px solid #88aaff; outline-offset: 2px; }
 .module-tabs button:hover:not([aria-selected="true"]) { background: #e4ecfa; }
 [role="tabpanel"] { scroll-margin-top: 90px; }
+
+/* profile-natural-height */
+#profile > .pair {
+  align-items: start;
+}
+#profile > .pair > .panel {
+  align-self: start;
+}

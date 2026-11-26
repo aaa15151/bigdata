@@ -9,7 +9,8 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}">
   <script defer src="{{ url_for('static', filename='echarts.min.js') }}"></script>
   <script defer src="{{ url_for('static', filename='presentation.js') }}"></script>
-  <script defer src="{{ url_for('static', filename='dashboard.js') }}"></script>
+  <script defer src="{{ url_for('static', filename='replay-player.js') }}"></script>
+<script defer src="{{ url_for('static', filename='dashboard.js') }}"></script>
   <link rel="stylesheet" href="{{ url_for('static', filename='modules.css') }}">
   <script defer src="{{ url_for('static', filename='modules.js') }}"></script>
 </head>
@@ -41,7 +42,10 @@
 <button type="button" role="tab" id="tab-similar" aria-controls="similar" aria-selected="false" tabindex="-1" data-module="similar">M1 相似电影</button>
 <button type="button" role="tab" id="tab-profile" aria-controls="profile" aria-selected="false" tabindex="-1" data-module="profile">M2 用户画像</button>
 <button type="button" role="tab" id="tab-graph" aria-controls="graph" aria-selected="false" tabindex="-1" data-module="graph">M4 电影关系网</button>
+
 </nav>
+    <script defer src="{{ url_for('static', filename='live-card.js') }}"></script>
+
     <section id="offline" role="tabpanel" aria-labelledby="tab-offline" tabindex="0">
       <div class="section-head"><h2 id="offline-heading">离线分析</h2><p id="offline-status" role="status">读取离线快照…</p></div>
       <div class="pair offline-grid">
@@ -102,10 +106,23 @@
     </section>
 
     <section id="realtime" role="tabpanel" aria-labelledby="tab-realtime" tabindex="0" hidden>
+<article class="panel" id="live-controls" style="padding:16px 20px;margin-bottom:16px">
+  <p id="live-status" role="status">正在连接评分推送服务…</p>
+  <p>本批活跃用户：<strong id="live-users">—</strong></p>
+  <p id="live-detail" class="small-note">等待评分批次</p>
+  <details>
+    <summary>连接设置</summary>
+    <div style="margin-top:10px">
+      <label for="live-address">推送地址</label>
+      <input id="live-address" style="width:min(100%,420px)">
+      <button id="live-connect" type="button">连接</button>
+    </div>
+  </details>
+</article>
       <div class="section-head"><h2 id="realtime-heading">实时评分回放</h2><p id="realtime-status" role="status">历史事件时间 · 每 5 秒刷新</p></div>
       <div class="pair realtime-grid">
         <article class="panel">
-          <div class="panel-head"><h3>五分钟窗口</h3><span>UTC</span></div>
+          <div class="panel-head"><h3>评分批次</h3><span>北京时间</span></div>
           <dl class="window-totals" aria-label="最新窗口指标">
             <div><dt>最新评分数</dt><dd id="window-count">—</dd></div>
             <div><dt>平均分</dt><dd id="window-average">—</dd></div>
@@ -113,8 +130,8 @@
           </dl>
           <div class="chart" id="realtime-chart" role="img" aria-label="五分钟评分数与低分比例图"></div>
           <div class="panel-subsection">
-            <div class="panel-head"><h3>窗口平均分趋势</h3><span>满分 5 分</span></div>
-            <div class="chart" id="average-chart" role="img" aria-label="最近五分钟窗口平均评分折线图"></div>
+            <div class="panel-head"><h3>批次平均分趋势</h3><span>满分 5 分</span></div>
+            <div class="chart" id="average-chart" role="img" aria-label="最近评分批次平均评分折线图"></div>
           </div>
         </article>
         <article class="panel alerts-panel">
@@ -122,7 +139,7 @@
           <p class="small-note">1–2 分为低分。占比达 20% 为中度，达 40% 为高度。</p>
           <ul class="alert-list" id="alerts"><li class="empty">读取窗口告警…</li></ul>
           <div class="panel-subsection alert-mix">
-            <div class="panel-head"><h3>窗口告警级别</h3><span>按窗口数</span></div>
+            <div class="panel-head"><h3>批次告警级别</h3><span>按批次数</span></div>
             <div class="chart" id="alert-mix-chart" role="img" aria-label="正常、中度与高度告警窗口比例环图"></div>
           </div>
         </article>
