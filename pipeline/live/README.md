@@ -1,5 +1,7 @@
 # 评分实时回放：已验证的 Java / Scala 路线
 
+**当前网页暂停/继续功能请使用 [受控实时演示操作手册](../../docs/live-control-demo.md)**，启动 `ControlledRatingsProducer.java` 和 `control_server.py`。下文保留基础链路与旧自动发送器的操作，旧发送器不支持网页暂停，不要与受控发送器同时运行。
+
 当前虚拟机 Python 为 3.5.2，因此以 `LiveRatingsProducer.java` 和 `stream_live.scala` 为主线。`replay.py` / `stream.py` 是早期备选，未在这次虚拟机验证，不要混用。
 
 ## 环境

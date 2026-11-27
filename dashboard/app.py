@@ -405,6 +405,9 @@ def create_app(config=None):
         app.logger.warning("Dashboard data unavailable: %s", error)
         return jsonify(error="暂时无法读取结果，请稍后重试"), 503
 
+    from live_control import live_control
+    app.register_blueprint(live_control)
+
     return app
 
 

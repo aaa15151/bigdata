@@ -305,13 +305,20 @@ let lastWindows;
 
 function replayZoom(chartId, count) {
   const instance = chart(chartId);
+  const states = replayZoom.states || (replayZoom.states = new WeakMap());
+  let state = states.get(instance);
+  if (!state) {
+    state = { manual: false };
+    states.set(instance, state);
+    instance.on("datazoom", () => { state.manual = true; });
+  }
   const previous = instance.getOption() || {};
   const oldCount = previous.series?.[0]?.data?.length || 0;
   const zoom = previous.dataZoom?.[0];
   const start = Number(zoom?.startValue ?? 0);
   const end = Number(zoom?.endValue ?? Math.max(0, oldCount - 1));
-  const follow = !zoom || end >= oldCount - 1;
-  const span = zoom ? Math.max(1, end - start) : 29;
+  const follow = !state.manual || !zoom || end >= oldCount - 1;
+  const span = state.manual && zoom ? Math.max(1, end - start) : 29;
   const nextEnd = follow ? Math.max(0, count - 1) : end;
   const nextStart = follow ? Math.max(0, nextEnd - span) : start;
   return [

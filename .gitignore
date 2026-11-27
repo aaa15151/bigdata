@@ -50,3 +50,6 @@ users.dat
 *.before-*
 *.class
 /.m2-live/
+/pipeline/live/control/
+/pipeline/live/active-control-run.txt
+/pipeline/live/control-test-run.txt
